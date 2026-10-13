@@ -1,0 +1,137 @@
+from pathlib import Path
+
+html = r'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chaminade Kart 3D</title>
+<style>
+:root{--navy:#0b1430;--red:#c83243;--gold:#ffd166;--cream:#fff8e9}
+*{box-sizing:border-box}body{margin:0;background:#0b1227;color:var(--cream);font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:1200px;margin:auto;padding:16px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}.brand{display:flex;gap:12px;align-items:center}.crest{background:linear-gradient(140deg,#d74453,#7c152b);border:2px solid var(--gold);border-radius:13px;width:48px;height:48px;display:grid;place-items:center;font-size:25px}h1{margin:0;font-size:clamp(22px,3.5vw,34px);letter-spacing:-.8px}.subtitle{font-size:12px;color:#b8c5e5;margin-top:3px}.tag{border:1px solid #ffffff35;border-radius:999px;padding:7px 11px;color:#ffdf91;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.game{position:relative;border:1px solid #ffffff2a;border-radius:18px;overflow:hidden;background:#86c7ed;box-shadow:0 20px 60px #0008}canvas{display:block;width:100%;height:min(69vh,690px);min-height:390px;outline:none;touch-action:none}.hud{position:absolute;left:12px;right:12px;top:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;flex-wrap:wrap}.huditem{background:#0b1430d9;border:1px solid #ffffff35;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:800;box-shadow:0 4px 14px #0002}.huditem span{color:var(--gold);margin-left:6px}.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:linear-gradient(#07112620,#07112670)}.modal{max-width:460px;width:100%;text-align:center;background:#0b1430ef;border:1px solid #ffffff3b;border-radius:20px;padding:25px;box-shadow:0 20px 70px #0007}.modal h2{font-size:clamp(24px,4vw,38px);line-height:1;margin:0 0 10px;color:#ffda70}.modal p{color:#d5def6;line-height:1.5;font-size:14px}.btn{background:var(--gold);border:0;border-radius:12px;padding:13px 20px;color:#211a18;font-weight:900;font-size:15px;cursor:pointer}.btn:hover{filter:brightness(1.06)}.small{font-size:11px;color:#9fb0d3;margin-top:12px}.bottom{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:13px 2px;color:#c3cde5;font-size:12px}.controls{display:flex;gap:7px;flex-wrap:wrap}kbd{background:#202f50;color:white;border:1px solid #6b7da7;border-bottom-width:3px;border-radius:5px;padding:3px 7px;font:inherit}.message{color:#ffdf91;text-align:right}.help{color:#91a2c7;font-size:11px;text-align:center;padding:4px 0 15px}
+.touch{display:none;position:absolute;bottom:14px;left:14px;right:14px;justify-content:space-between;align-items:end;pointer-events:none}.touchgroup{display:flex;gap:8px;pointer-events:auto}.touch button{width:54px;height:54px;border:1px solid #ffffff65;border-radius:15px;background:#0b1430bd;color:white;font-size:20px;font-weight:900;touch-action:none}.touch .gas{height:66px;background:#c83243ed}.touch .brake{background:#263756e8}
+@media(max-width:650px){main{padding:8px}.top{margin-bottom:8px}.tag{display:none}canvas{height:68vh;min-height:420px}.bottom{grid-template-columns:1fr}.message{text-align:left}.touch{display:flex}.modal{padding:19px}.huditem{padding:7px 9px;font-size:11px}}
+</style>
+</head>
+<body><main>
+<header class="top"><div class="brand"><div class="crest">🏁</div><div><h1>CHAMINADE KART 3D</h1><div class="subtitle">FACULTY GRAND PRIX · UNOFFICIAL FAN-MADE GAME</div></div></div><div class="tag">3D browser racer</div></header>
+<section class="game">
+<canvas id="view" tabindex="0" aria-label="3D kart racing game. Use arrow keys or WASD to drive."></canvas>
+<div class="hud"><div class="huditem">LAP <span id="lap">1 / 3</span></div><div class="huditem">PLACE <span id="place">1st</span></div><div class="huditem">SPEED <span id="speed">0</span> mph</div><div class="huditem">TIME <span id="time">00:00</span></div></div>
+<div class="overlay" id="overlay"><div class="modal"><h2 id="modalTitle">FACULTY GRAND PRIX</h2><p id="modalText">Hop in your kart and race around campus in a colorful 3D-style world. Dodge cones, pass the faculty, and complete three laps!</p><button class="btn" id="go">START YOUR ENGINE</button><div class="small">WASD / arrow keys to steer · ↑ accelerate · ↓ brake · Space boost · R restart</div></div></div>
+<div class="touch"><div class="touchgroup"><button data-key="ArrowLeft">◀</button><button data-key="ArrowRight">▶</button></div><div class="touchgroup"><button class="brake" data-key="ArrowDown">▼</button><button class="gas" data-key="ArrowUp">▲</button></div></div>
+</section>
+<div class="bottom"><div class="controls"><span><kbd>↑</kbd>/<kbd>W</kbd> accelerate</span><span><kbd>←</kbd><kbd>→</kbd> steer</span><span><kbd>↓</kbd> brake</span><span><kbd>SPACE</kbd> boost</span><span><kbd>R</kbd> restart</span></div><div class="message" id="message">Ready at the starting line!</div></div>
+<div class="help">Tip: Steering moves your kart across the road. Grass slows you down. Drive through glowing rings for a boost.</div>
+</main>
+<script>
+(()=>{
+const canvas=document.getElementById('view'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+let W=900,H=560,dpr=1;
+const input={};let state='menu',last=0,elapsed=0,player={x:0,speed:0,lap:1,progress:0,boost:0,shake:0};
+let rivals=[],items=[],cones=[],particles=[],toast='Ready at the starting line!',toastT=0;
+const trackLen=5600;
+const names=['You','Mr. Chalk','Coach Zoom','Ms. Detour','Brother Turbo'];
+const kartColors=['#e74455','#ffcf4a','#45c9a8','#a48aff','#ff8b43'];
+function resize(){const r=canvas.getBoundingClientRect();dpr=Math.min(window.devicePixelRatio||1,2);W=Math.max(320,r.width);H=Math.max(390,r.height);canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);}
+window.addEventListener('resize',resize);resize();
+function reset(){elapsed=0;player={x:0,speed:0,lap:1,progress:0,boost:0,shake:0};rivals=names.slice(1).map((name,i)=>({name,x:(i%2?-.45:.45),speed:.43+i*.025,progress:-(i+1)*90,color:kartColors[i+1],boost:0}));items=[];cones=[];particles=[];for(let i=0;i<20;i++){items.push({z:220+i*265,lane:(Math.sin(i*4.13)*.72),taken:false});}for(let i=0;i<18;i++){cones.push({z:380+i*290,lane:Math.sin(i*2.7)*.85});}state='menu';$('lap').textContent='1 / 3';$('place').textContent='1st';$('speed').textContent='0';$('time').textContent='00:00';$('overlay').style.display='flex';$('modalTitle').textContent='FACULTY GRAND PRIX';$('modalText').textContent='Hop in your kart and race around campus in a colorful 3D-style world. Dodge cones, pass the faculty, and complete three laps!';$('go').textContent='START YOUR ENGINE';say('Ready at the starting line!');}
+function start(){if(state==='done')reset();state='race';elapsed=0;last=performance.now();$('overlay').style.display='none';canvas.focus();say('GO! GO! GO!');}
+function say(s){toast=s;toastT=2.5;$('message').textContent=s;}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function fmt(t){t=Math.max(0,Math.floor(t));return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');}
+function ordinal(n){return n===1?'1st':n===2?'2nd':n===3?'3rd':n+'th';}
+function roadCurve(z){return Math.sin(z*.0009)*.65+Math.sin(z*.0021)*.18;}
+function horizon(){return H*.38;}
+function project(z,lane=0){const near=H*.94,far=horizon();const depth=clamp(1-z/1450,0,1);const y=far+(near-far)*(1-depth);const roadHalf=(W*.49)*(1-depth*.78);const curve=roadCurve(player.progress+z)-roadCurve(player.progress);const center=W*.5+curve*W*.65*(1-depth*.4)-player.x*roadHalf*.72;const x=center+lane*roadHalf;return {x,y,roadHalf,scale:.15+depth*1.6,depth,center};}
+function poly(points,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);ctx.closePath();ctx.fill();}
+function roundRect(x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}}
+function drawSky(){
+ const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#60b5ee');g.addColorStop(.65,'#c8edff');g.addColorStop(1,'#7cbd78');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ // clouds
+ for(let i=0;i<6;i++){const x=((i*197-elapsed*5)%(W+180)+W+180)%(W+180)-60,y=H*(.1+(i%3)*.07);ctx.fillStyle='#ffffffb9';ctx.beginPath();ctx.arc(x,y,19,0,7);ctx.arc(x+20,y-8,25,0,7);ctx.arc(x+45,y,17,0,7);ctx.fill();}
+ // distant campus silhouette
+ for(let i=0;i<8;i++){let x=i*W/7;const bh=25+(i%3)*18;ctx.fillStyle=i%2?'#a3c8c4':'#92b7ad';ctx.fillRect(x,H*.37-bh,Math.max(20,W/11),bh);ctx.fillStyle='#e9e3c9';for(let j=0;j<3;j++)ctx.fillRect(x+5+j*8,H*.37-bh+9,4,7);}
+}
+function drawGround(){
+ const hz=horizon();poly([[0,hz],[W,hz],[W,H],[0,H]],'#69a95e');
+ // alternating grass bands
+ for(let i=0;i<13;i++){let z=i*130+((player.progress*1.4)%130);let p=project(z);ctx.fillStyle=i%2?'#6caf62':'#78b968';ctx.fillRect(0,p.y,W,Math.max(1,H/30));}
+}
+function drawRoad(){
+ // perspective road strips from far to near
+ for(let z=1450;z>0;z-=35){
+  const a=project(z),b=project(z-35);
+  poly([[a.center-a.roadHalf,a.y],[a.center+a.roadHalf,a.y],[b.center+b.roadHalf,b.y],[b.center-b.roadHalf,b.y]],Math.floor((z+player.progress)/100)%2?'#454b5a':'#4d5361');
+  // curb red-white segments
+  const stripe=Math.floor((z+player.progress)/70)%2?'#f8f0d7':'#d83f4c';
+  poly([[a.center-a.roadHalf,a.y],[a.center-a.roadHalf+Math.max(2,a.roadHalf*.035),a.y],[b.center-b.roadHalf+Math.max(2,b.roadHalf*.035),b.y],[b.center-b.roadHalf,b.y]],stripe);
+  poly([[a.center+a.roadHalf-Math.max(2,a.roadHalf*.035),a.y],[a.center+a.roadHalf,a.y],[b.center+b.roadHalf,b.y],[b.center+b.roadHalf-Math.max(2,b.roadHalf*.035),b.y]],stripe);
+  if(Math.floor((z+player.progress)/150)%2===0){for(let lane=-.33;lane<=.34;lane+=.67){const xa=a.center+a.roadHalf*lane,xb=b.center+b.roadHalf*lane;poly([[xa-1,a.y],[xa+1,a.y],[xb+2,b.y],[xb-2,b.y]],'#ffffff75');}}
+ }
+ // start finish checker line
+ const z=((trackLen-(player.progress%trackLen))%trackLen);if(z<420){const p=project(z);if(p.y>horizon()){for(let i=0;i<12;i++){ctx.fillStyle=i%2?'#fff':'#1c263c';ctx.fillRect(p.center-p.roadHalf+i*p.roadHalf*2/12,p.y,Math.max(2,p.roadHalf*2/12),5+p.scale*3);}}}
+}
+function tree(x,y,s){ctx.fillStyle='#594c3a';ctx.fillRect(x-s*.09,y-s*.1,s*.18,s*.5);ctx.fillStyle='#286747';ctx.beginPath();ctx.arc(x,y-s*.35,s*.38,0,7);ctx.fill();ctx.fillStyle='#3b8b55';ctx.beginPath();ctx.arc(x-s*.12,y-s*.46,s*.25,0,7);ctx.fill();}
+function drawScenery(){
+ for(let z=1450;z>80;z-=95){const p=project(z);const s=p.scale;const left=p.center-p.roadHalf-s*20,right=p.center+p.roadHalf+s*20;
+  if(Math.floor(z/95)%2===0){tree(left,p.y,s*28);tree(right,p.y,s*30);}
+  else {roundRect(left-s*12,p.y-s*28,s*40,s*28,3,'#e4d7b7');ctx.fillStyle='#a83243';ctx.fillRect(left-s*14,p.y-s*31,s*44,s*6);roundRect(right-s*5,p.y-s*22,s*34,s*22,3,'#d7e1d9');}
+ }
+ // campus welcome sign at roadside
+ const p=project(980);if(p.y>horizon()){roundRect(p.center-p.roadHalf-70*p.scale,p.y-54*p.scale,65*p.scale,32*p.scale,4,'#f4e9cb','#fff');ctx.fillStyle='#23395c';ctx.font=`bold ${Math.max(5,8*p.scale)}px system-ui`;ctx.textAlign='center';ctx.fillText('CHAMINADE',p.center-p.roadHalf-37*p.scale,p.y-35*p.scale);ctx.textAlign='left';}
+}
+function drawKart(x,y,s,color,name,tilt=0,isPlayer=false){
+ ctx.save();ctx.translate(x,y);ctx.rotate(tilt);
+ // ground shadow
+ ctx.fillStyle='#15233355';ctx.beginPath();ctx.ellipse(0,s*.1,s*.55,s*.22,0,0,7);ctx.fill();
+ // tires
+ roundRect(-s*.46,-s*.2,s*.25,s*.48,s*.08,'#171b25');roundRect(s*.21,-s*.2,s*.25,s*.48,s*.08,'#171b25');roundRect(-s*.46,s*.36,s*.25,s*.48,s*.08,'#171b25');roundRect(s*.21,s*.36,s*.25,s*.48,s*.08,'#171b25');
+ // kart body in perspective
+ poly([[-s*.52,-s*.2],[-s*.37,-s*.55],[s*.37,-s*.55],[s*.52,-s*.2],[s*.43,s*.53],[-s*.43,s*.53]],color);
+ poly([[-s*.37,-s*.55],[0,-s*.75],[s*.37,-s*.55],[s*.27,-s*.28],[-s*.27,-s*.28]],'#fff4d9');
+ // driver head and helmet
+ ctx.fillStyle='#f1c9a1';ctx.beginPath();ctx.arc(0,-s*.55,s*.19,0,7);ctx.fill();ctx.fillStyle=isPlayer?'#e9d7ff':'#f6d55c';ctx.beginPath();ctx.arc(0,-s*.62,s*.22,Math.PI,Math.PI*2);ctx.fill();ctx.fillRect(-s*.2,-s*.63,s*.4,s*.08);
+ // badge
+ ctx.fillStyle='#fff';ctx.font=`900 ${Math.max(7,s*.18)}px system-ui`;ctx.textAlign='center';ctx.fillText(isPlayer?'YOU':'',0,s*.2);
+ if(name){const fs=Math.max(9,Math.min(13,s*.2));ctx.font=`bold ${fs}px system-ui`;const width=Math.max(48,ctx.measureText(name).width+12);roundRect(-width/2,-s*.99,width,fs+7,5,'#0b1430e8','#ffffff70');ctx.fillStyle='#fff';ctx.fillText(name,0,-s*.99+fs+1);}
+ ctx.restore();ctx.textAlign='left';
+}
+function drawItems(){
+ for(const it of items){if(it.taken)continue;let z=it.z-player.progress;if(z<0)z+=trackLen;if(z>1450)continue;const p=project(z,it.lane),s=p.scale;ctx.save();ctx.translate(p.x,p.y-s*14);ctx.rotate(elapsed*1.5);ctx.fillStyle='#ffe45c';ctx.strokeStyle='#fff8bb';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,Math.max(4,8*s),0,7);ctx.fill();ctx.stroke();ctx.fillStyle='#25324c';ctx.font=`bold ${Math.max(7,10*s)}px system-ui`;ctx.textAlign='center';ctx.fillText('★',0,3*s);ctx.restore();}
+}
+function drawCones(){for(const c of cones){let z=c.z-player.progress;if(z<0)z+=trackLen;if(z>1100)continue;const p=project(z,c.lane),s=p.scale*8;poly([[p.x,p.y-s*1.5],[p.x-s*.6,p.y],[p.x+s*.6,p.y]],'#ff8c38');ctx.fillStyle='#fff0d7';ctx.fillRect(p.x-s*.38,p.y-s*.43,s*.76,Math.max(1,s*.18));}}
+function drawRivals(){const sorted=[...rivals].sort((a,b)=>{let za=(a.progress-player.progress+trackLen)%trackLen,zb=(b.progress-player.progress+trackLen)%trackLen;return zb-za;});for(const r of sorted){let rel=r.progress-player.progress;while(rel<0)rel+=trackLen;while(rel>trackLen)rel-=trackLen;if(rel<35)rel+=trackLen;if(rel>1450)continue;const p=project(rel,r.x);const s=15+p.depth*45;drawKart(p.x,p.y-s*.1,s,r.color,r.name,0,false);}}
+function drawPlayer(){const x=W*.5+player.x*W*.25;const y=H*.83;const s=Math.min(W*.095,75);drawKart(x,y,s,kartColors[0],'',player.x*.22,true);if(player.boost>0){for(let i=0;i<5;i++){ctx.fillStyle=i%2?'#ffdf63':'#ff773b';ctx.beginPath();ctx.moveTo(x-s*.24+(Math.random()-.5)*s*.15,y+s*.45);ctx.lineTo(x-s*.1+(Math.random()-.5)*s*.2,y+s*(.65+Math.random()*.3));ctx.lineTo(x+(Math.random()-.5)*s*.3,y+s*.45);ctx.fill();}}}
+function drawVignette(){const g=ctx.createRadialGradient(W/2,H/2,H*.15,W/2,H/2,H*.8);g.addColorStop(0,'#0000');g.addColorStop(1,'#08132950');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
+function render(){ctx.clearRect(0,0,W,H);drawSky();drawGround();drawScenery();drawRoad();drawItems();drawCones();drawRivals();drawPlayer();drawVignette();if(state==='race'&&toastT>0){ctx.font='900 17px system-ui';ctx.textAlign='center';ctx.fillStyle='#fff';ctx.shadowColor='#071126';ctx.shadowBlur=8;ctx.fillText(toast,W/2,H*.2);ctx.shadowBlur=0;ctx.textAlign='left';}}
+function update(dt){
+ if(state!=='race')return;elapsed+=dt;const acc=input.ArrowUp||input.KeyW,brake=input.ArrowDown||input.KeyS,left=input.ArrowLeft||input.KeyA,right=input.ArrowRight||input.KeyD;
+ const max=player.boost>0?1.45:1;
+ if(acc)player.speed=Math.min(max,player.speed+dt*.72);else player.speed=Math.max(.25,player.speed-dt*.18);
+ if(brake)player.speed=Math.max(0,player.speed-dt*1.05);
+ if(left)player.x-=dt*(.8+player.speed*.42);if(right)player.x+=dt*(.8+player.speed*.42);player.x=clamp(player.x,-1.38,1.38);
+ if(Math.abs(player.x)>1.02){player.speed=Math.max(.2,player.speed-dt*.8);if(Math.random()<dt*1.4)say('Grass slows you down! Get back on the road.');}
+ if(player.boost>0)player.boost-=dt;
+ player.progress+=player.speed*dt*230;
+ if(player.progress>=trackLen){player.progress-=trackLen;player.lap++;if(player.lap>3){state='done';$('overlay').style.display='flex';$('modalTitle').textContent='CHECKERED FLAG!';$('modalText').textContent='You finished the Faculty Grand Prix in '+fmt(elapsed)+'. Ready for another lap around campus?';$('go').textContent='RACE AGAIN';say('You crossed the finish line!');}}
+ for(const r of rivals){r.progress+=r.speed*dt*230*(1+Math.sin(elapsed*1.3+r.x*4)*.045);if(r.progress>=trackLen)r.progress-=trackLen;}
+ for(const it of items){let z=it.z-player.progress;if(z<0)z+=trackLen;if(!it.taken&&z<24&&Math.abs(player.x-it.lane)<.24){it.taken=true;player.boost=2.1;player.speed=Math.min(1.45,player.speed+.5);say('SCHOOL SPIRIT BOOST!');}}
+ for(const c of cones){let z=c.z-player.progress;if(z<0)z+=trackLen;if(z<17&&Math.abs(player.x-c.lane)<.17){c.z=player.progress+480;player.speed=Math.max(.22,player.speed*.58);player.x=clamp(player.x+(player.x<c.lane?-.14:.14),-1.35,1.35);say('Oof! Cone collision — keep it clean!');}}
+ // simple ranking by distance in current 3-lap event
+ const myDist=(player.lap-1)*trackLen+player.progress;let place=1;for(const r of rivals){let rd=r.progress;if(rd>myDist)place++;} $('lap').textContent=Math.min(3,player.lap)+' / 3';$('place').textContent=ordinal(place);$('speed').textContent=Math.round(player.speed*145);$('time').textContent=fmt(elapsed);toastT=Math.max(0,toastT-dt);
+}
+function loop(now){const dt=Math.min(.04,Math.max(0,(now-last)/1000));last=now;update(dt);render();requestAnimationFrame(loop);}
+$('go').addEventListener('click',start);
+window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();input[e.code]=true;if(e.code==='Space'&&state==='race'&&player.boost<=0){player.boost=1.5;player.speed=Math.min(1.45,player.speed+.45);say('HALL PASS TURBO!');}if(e.code==='KeyR')reset();if(e.code==='Enter'&&state!=='race')start();});
+window.addEventListener('keyup',e=>input[e.code]=false);
+document.querySelectorAll('[data-key]').forEach(b=>{const key=b.dataset.key;const down=e=>{e.preventDefault();input[key]=true;};const up=e=>{e.preventDefault();input[key]=false;};b.addEventListener('pointerdown',down);b.addEventListener('pointerup',up);b.addEventListener('pointerleave',up);b.addEventListener('pointercancel',up);});
+reset();last=performance.now();requestAnimationFrame(loop);
+})();
+</script>
+</body></html>'''
+path = Path("/mnt/data/chaminade_kart_3d.html")
+path.write_text(html, encoding="utf-8")
+print(f"Created browser-playable 3D-style racing game: {path} ({path.stat().st_size:,} bytes)")
